@@ -700,7 +700,8 @@
 
     window.addEventListener('beforeunload', e => { if (formStarted) { e.preventDefault(); e.returnValue = ''; } });
 
-    if (hasDraft()) setTimeout(() => openModal('customDraftRestore'), 400);
+    // Draft restore HANYA kalau bukan mode revisi (revisi auto-fill dari server)
+    if (!isRevisi && hasDraft()) setTimeout(() => openModal('customDraftRestore'), 400);
 
     showStep(1);
   });

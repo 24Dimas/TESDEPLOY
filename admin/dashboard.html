@@ -542,8 +542,20 @@
   }
 
   // ===== LOAD DATA =====
-  // ===== Track jumlah data sebelumnya untuk deteksi data baru =====
+  // ===== Track hash data sebelumnya untuk deteksi perubahan =====
   let prevDataCount = 0;
+  let prevDataHash = '';
+
+  // Hash sederhana: kombinasi length + ref + status setiap row
+  function computeDataHash(data) {
+    if (!data || !data.length) return '0';
+    let h = data.length + '|';
+    for (let i = 0; i < data.length; i++) {
+      const r = data[i];
+      h += (r.ref_number || '') + ':' + (r.status || '') + ':' + (r.revisi_count || '0') + ';';
+    }
+    return h;
+  }
 
   async function loadData(silent) {
     if (!silent) {
@@ -557,19 +569,98 @@
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const json = await res.json();
       const newData = json.data || [];
+      const newHash = computeDataHash(newData);
 
-      // Deteksi data baru (saat silent reload)
+      // ===== SMART REFRESH (silent mode) =====
+      // Kalau data sama persis (hash sama), skip re-render — cukup update timestamp
+      if (silent && newHash === prevDataHash && prevDataHash !== '') {
+        // Tidak ada perubahan, cukup update jam terakhir cek (tanpa ganggu UI)
+        const now = new Date();
+        const waktu = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+        const tgl   = now.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+        document.getElementById("lastUpdatedText").textContent = `Diperbarui ${tgl}, ${waktu}`;
+        return; // EXIT — gak re-render apapun
+      }
+
+      // Deteksi data baru
       if (silent && prevDataCount > 0 && newData.length > prevDataCount) {
         const delta = newData.length - prevDataCount;
         showToast(`📬 ${delta} pengajuan baru masuk!`, "success");
       }
       prevDataCount = newData.length;
+      prevDataHash = newHash;
 
-      allData = newData;
-      filteredData = [...allData];
-      window.filteredData = filteredData;
-      renderDashboard();
-      renderTable(filteredData);
+      // ===== SILENT MODE: pertahankan state UI =====
+      if (silent && allData.length > 0) {
+        // Save state user sebelum re-render
+        const savedPage = currentPage;
+        const savedScroll = window.scrollY;
+        const searchFocused = document.activeElement &&
+                              document.activeElement.id === 'searchInput';
+        const searchCursor = searchFocused ?
+          [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
+
+        // Update sumber data
+        allData = newData;
+
+        // Re-apply filter (baca dari DOM input)
+        const dari   = document.getElementById("filterDari").value;
+        const sampai = document.getElementById("filterSampai").value;
+        const status = document.getElementById("filterStatus").value;
+        filteredData = allData.filter(r => {
+          const tgl = r.timestamp ? new Date(r.timestamp) : null;
+          if (dari && tgl && tgl < new Date(dari)) return false;
+          if (sampai && tgl && tgl > new Date(sampai + "T23:59:59")) return false;
+          if (status && (r.status || "Pending") !== status) return false;
+          return true;
+        });
+        window.filteredData = filteredData;
+
+        // Re-apply search
+        const q = (document.getElementById("searchInput").value || "").toLowerCase();
+        let displayData = filteredData;
+        if (q) {
+          displayData = filteredData.filter(r =>
+            (r.nama || "").toLowerCase().includes(q) ||
+            (r.proposal || "").toLowerCase().includes(q) ||
+            (r.email || "").toLowerCase().includes(q) ||
+            (r.lokasi || "").toLowerCase().includes(q) ||
+            (r.nama_lembaga || r.lembaga || r.kampus || "").toLowerCase().includes(q)
+          );
+        }
+
+        // Re-apply sort
+        const sorted = [...displayData].sort((a, b) => {
+          const tA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+          const tB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+          return sortAsc ? tA - tB : tB - tA;
+        });
+
+        // Update dashboard stats tetap di-render karena ringan
+        renderDashboard();
+        // Render table dengan PAGE YANG SAMA seperti sebelum refresh
+        renderTable(sorted, savedPage);
+
+        // Restore scroll position & search focus
+        window.scrollTo(0, savedScroll);
+        if (searchFocused) {
+          const si = document.getElementById('searchInput');
+          if (si) {
+            si.focus();
+            if (searchCursor) {
+              try { si.setSelectionRange(searchCursor[0], searchCursor[1]); } catch(e) {}
+            }
+          }
+        }
+      } else {
+        // Normal full reload
+        allData = newData;
+        filteredData = [...allData];
+        window.filteredData = filteredData;
+        renderDashboard();
+        renderTable(filteredData);
+      }
+
       // Update timestamp
       const now = new Date();
       const waktu = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
@@ -596,7 +687,9 @@
     autoRefreshTimer = setInterval(() => {
       // Skip kalau modal terbuka (user lagi interaksi)
       if (document.querySelector('.modal-overlay.show, .custom-modal-overlay[style*="flex"]')) return;
-      // Skip kalau tab tidak aktif (hemat bandwidth)
+      // Skip kalau dropdown 3-titik sedang terbuka
+      if (document.querySelector('.row-menu.show, .action-menu.show, .dropdown.show')) return;
+      // Skip kalau tab tidak aktif
       if (document.hidden) return;
       loadData(true); // silent mode
     }, AUTO_REFRESH_MS);
@@ -607,9 +700,7 @@
 
   // Pause auto-refresh saat tab tidak aktif, resume saat aktif
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      // tab hidden — auto-refresh skip (handled in interval)
-    } else {
+    if (!document.hidden) {
       // tab visible again — refresh sekarang
       loadData(true);
     }
@@ -1034,6 +1125,16 @@
     document.getElementById("modalStatus").classList.add("show");
   }
 
+  // Map status → subject email (untuk auto-open setelah ubah status)
+  function statusToEmailSubject(status) {
+    const map = {
+      "Diproses": "info",
+      "Selesai":  "selesai",
+      "Ditolak":  "ditolak",
+    };
+    return map[status] || null;
+  }
+
   async function saveStatus() {
     const status = document.getElementById("modalStatusSelect").value;
     const row = filteredData.find(r => r.rowIndex == currentRowIndex);
@@ -1049,6 +1150,19 @@
       renderDashboard();
       closeModal("modalStatus");
       showToast("Status berhasil diperbarui!", "success");
+
+      // ===== AUTO-OPEN MODAL EMAIL kalau status butuh notif =====
+      const subj = statusToEmailSubject(status);
+      if (subj) {
+        // Tunggu sebentar biar transition close modal status selesai
+        setTimeout(() => {
+          openModalEmail(row.rowIndex, row.nama, row.email);
+          document.getElementById("modalEmailSubject").value = subj;
+          toggleFileUpload();
+          // Banner info biar admin tahu ini auto-trigger
+          showToast("📧 Yuk kirim notifikasi ke pemohon", "info");
+        }, 350);
+      }
     } catch (err) {
       showToast("Gagal memperbarui status!", "error");
     } finally {
