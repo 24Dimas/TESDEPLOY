@@ -619,7 +619,24 @@
     ov.id = 'revisiLoadingOverlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,42,94,0.85);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;font-family:Plus Jakarta Sans,sans-serif;';
     ov.innerHTML = `
-      <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#c8a951;border-radius:50%;animation:spinRing 0.8s linear infinite;margin-bottom:16px;"></div>
+      <style>
+        @keyframes revisiSpin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .revisi-spinner {
+          width: 48px;
+          height: 48px;
+          border: 4px solid rgba(255,255,255,0.2);
+          border-top-color: #c8a951;
+          border-radius: 50%;
+          margin-bottom: 16px;
+          animation: revisiSpin 0.8s linear infinite;
+          -webkit-animation: revisiSpin 0.8s linear infinite;
+          will-change: transform;
+        }
+      </style>
+      <div class="revisi-spinner"></div>
       <div style="font-size:15px;font-weight:600;">Memuat data revisi...</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">Mohon tunggu sebentar</div>
     `;

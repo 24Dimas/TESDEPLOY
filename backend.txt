@@ -176,7 +176,7 @@ function kirimEmailKonfirmasi(e, refNum, isRevisi) {
 
 
         var subject = isRevisi
-          ? "🔄 Revisi Pengajuan Diterima – Kesbangpol Kudus [" + refNum + "]"
+          ? "✅ Revisi Pengajuan Diterima – Kesbangpol Kudus [" + refNum + "]"
           : "✅ Registrasi Penelitian Diterima – Kesbangpol Kudus [" + refNum + "]";
 
         var htmlBody = `
