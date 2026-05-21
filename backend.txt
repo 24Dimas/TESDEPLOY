@@ -621,15 +621,15 @@ function handleSendEmail(e) {
         <!-- TOMBOL REVISI -->
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;margin-bottom:24px;">
           <tr><td style="padding:20px 22px;text-align:center;">
-            <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:12px;font-weight:700;color:#0c4a6e;text-transform:uppercase;letter-spacing:1.2px;">&#9998; Ajukan Revisi</p>
+            <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:12px;font-weight:700;color:#0c4a6e;text-transform:uppercase;letter-spacing:1.2px;">📝 Ajukan Revisi</p>
             <p style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:13px;color:#0c4a6e;line-height:1.7;">
               Bapak/Ibu dapat memperbaiki data yang kurang dan mengirim ulang pengajuan melalui tombol di bawah ini. Data Anda akan otomatis terisi.
             </p>
             <a href="${revisiUrl}" style="display:inline-block;background:linear-gradient(135deg,#2558a3,#1a3a5c);color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:10px;font-family:Arial,sans-serif;font-size:14px;font-weight:700;box-shadow:0 4px 12px rgba(37,88,163,0.3);">
-              &#10227; Revisi Pengajuan
+              🔄 Revisi Pengajuan
             </a>
             <p style="margin:12px 0 0;font-family:Arial,sans-serif;font-size:11px;color:#6b7a8d;">
-              Klik tombol di atas. Data Anda akan otomatis terisi &mdash; tinggal perbaiki lalu kirim ulang.<br>
+              Klik tombol di atas. Data Anda akan otomatis terisi — tinggal perbaiki lalu kirim ulang.<br>
               Atau salin link berikut:<br>
               <span style="color:#2558a3;word-break:break-all;">${revisiUrl}</span>
             </p>
