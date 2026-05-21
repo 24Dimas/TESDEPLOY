@@ -2,7 +2,7 @@
 // KONFIGURASI — URL FRONTEND (ubah saat deploy)
 // Dipakai untuk membentuk link revisi di email penolakan.
 // ============================================================
-var FRONTEND_BASE_URL = "https://tessireino.netlify.app/";
+var FRONTEND_BASE_URL = "https://tessireino.netlify.app";
 
 function doPost(e) {
   // ===== LOGIN ADMIN via POST (aman, tidak lewat URL) =====
