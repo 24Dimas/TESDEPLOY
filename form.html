@@ -99,12 +99,36 @@
     <form id="uploadForm" method="POST">
       <input type="hidden" name="fileContent" id="fileContent">
       <input type="hidden" name="filename" id="filename">
+      <input type="hidden" name="jenis_pengajuan" id="jenis_pengajuan" value="baru">
+
+      <!-- Banner perpanjangan (muncul kalau mode perpanjangan) -->
+      <div id="perpanjanganBanner" style="display:none;background:linear-gradient(135deg,#e8f4ff,#dbeeff);border:1px solid #90c4f0;border-left:4px solid #1a5cb5;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:none;align-items:start;gap:12px;">
+        <div style="font-size:22px;flex-shrink:0;">🔁</div>
+        <div style="flex:1;font-size:13px;line-height:1.6;color:#0c3a6e;">
+          <strong style="display:block;margin-bottom:3px;font-size:13.5px;">Mode Perpanjangan Surat</strong>
+          <span id="perpanjanganBannerMsg">Anda sedang mengisi formulir perpanjangan surat penelitian.</span>
+        </div>
+      </div>
 
       <!-- ===== STEP 2: DATA SURAT ===== -->
       <div class="step-pane" data-pane="2">
         <div class="section-group">
           <div class="section-group-title">
             <i class="bi bi-envelope-paper"></i> Data Surat Pengantar
+          </div>
+
+          <!-- Field khusus perpanjangan (hanya muncul saat mode perpanjangan) -->
+          <div class="input-box field" id="nomorSuratLamaBox" style="display:none;">
+            <label for="nomor_surat_lama" class="form-label">
+              Nomor Surat Rekomendasi Lama <span style="color:var(--danger)">*</span>
+            </label>
+            <input type="text" id="nomor_surat_lama" name="nomor_surat_lama"
+              class="form-control" placeholder="Nomor surat rekomendasi yang akan diperpanjang">
+            <small style="display:block;font-size:11px;color:#6c8194;margin-top:4px;">
+              <i class="bi bi-info-circle" style="margin-right:3px;"></i>
+              Tertera di surat rekomendasi penelitian yang Anda terima sebelumnya.
+            </small>
+            <small class="error-text">Wajib diisi</small>
           </div>
 
           <div class="input-box field">
@@ -274,10 +298,34 @@
 
           <div class="input-box field" id="opd-wrapper">
             <label class="form-label">Nama OPD / Bidang Penelitian <span style="color:var(--danger)">*</span></label>
-            <div id="opd-list"></div>
-            <button type="button" class="btn-tambah-anggota" onclick="tambahOPD()">
-              <i class="bi bi-plus-circle"></i> Tambah OPD
-            </button>
+
+            <!-- Toggle lampiran -->
+            <div class="opd-mode-toggle">
+              <label class="opd-toggle-label">
+                <input type="checkbox" id="opdLampiranToggle" onchange="toggleOPDMode()">
+                <span class="opd-toggle-text">OPD lebih dari 3 / pakai lampiran</span>
+              </label>
+            </div>
+
+            <!-- Mode normal: input manual -->
+            <div id="opd-manual">
+              <div id="opd-list"></div>
+              <button type="button" class="btn-tambah-anggota" onclick="tambahOPD()">
+                <i class="bi bi-plus-circle"></i> Tambah OPD
+              </button>
+            </div>
+
+            <!-- Mode lampiran -->
+            <div id="opd-lampiran" style="display:none;">
+              <div class="opd-lampiran-info">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>
+                  Kolom OPD akan otomatis diisi <strong>"Lampiran"</strong>.<br>
+                  Jangan lupa <strong>sertakan daftar OPD lengkap</strong> di dalam file ZIP/RAR yang kamu upload.
+                </div>
+              </div>
+            </div>
+
             <input type="hidden" id="lokasi" name="lokasi">
             <small class="error-text" id="opd-error-text">Wajib diisi minimal 1 OPD</small>
           </div>
@@ -460,7 +508,7 @@
   Dikembangkan oleh <strong>Dimas Wahyu Damar Panuluh</strong> — Teknik Informatika, Universitas Muria Kudus
 </footer>
 
-<!-- ===== WELCOME POPUP (V7 style) ===== -->
+<!-- ===== POPUP PILIHAN TIPE PENGAJUAN ===== -->
 <div id="popupModal" class="popup-modal" style="display:none;">
   <div class="popup-content">
     <img src="src/NEW_LOGO.jpg" alt="Si-Reino" class="popup-image">
@@ -468,11 +516,123 @@
     <div class="popup-title">Formulir Registrasi Penelitian</div>
     <div class="popup-divider"></div>
 
+    <!-- PILIHAN TIPE -->
+    <div id="popupTipeView">
+      <p style="font-size:13.5px;color:#5a6e85;margin-bottom:18px;line-height:1.6;">
+        Pilih jenis pengajuan yang sesuai dengan kebutuhan Anda:
+      </p>
+      <button class="popup-pilihan-btn" onclick="pilihTipePengajuan('baru')">
+        <span class="popup-pilihan-icon">📋</span>
+        <div class="popup-pilihan-text">
+          <strong>Registrasi Baru</strong>
+          <small>Pertama kali mengajukan izin penelitian</small>
+        </div>
+        <i class="bi bi-arrow-right"></i>
+      </button>
+      <button class="popup-pilihan-btn" onclick="pilihTipePengajuan('perpanjangan')">
+        <span class="popup-pilihan-icon">🔁</span>
+        <div class="popup-pilihan-text">
+          <strong>Perpanjangan Surat</strong>
+          <small>Memperpanjang izin penelitian yang sudah ada</small>
+        </div>
+        <i class="bi bi-arrow-right"></i>
+      </button>
+      <button class="popup-back" onclick="konfirmasiKembali()" style="margin-top:10px;">
+        <i class="bi bi-house"></i> Kembali ke beranda
+      </button>
+    </div>
+
+    <!-- PERPANJANGAN: pilih sudah/belum pernah isi website -->
+    <div id="popupPerpanjanganView" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <button onclick="backToTipe()" style="background:none;border:none;cursor:pointer;color:#5a6e85;font-size:13px;display:flex;align-items:center;gap:4px;">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+      </div>
+      <div class="popup-welcome-badge" style="background:#e8f4ff;color:#1a5cb5;margin-bottom:12px;">🔁 Perpanjangan Surat</div>
+      <p style="font-size:13.5px;color:#5a6e85;margin-bottom:18px;line-height:1.6;">
+        Apakah Anda sudah pernah mendaftar melalui website Si-Reino sebelumnya?
+      </p>
+      <button class="popup-pilihan-btn" onclick="pilihPerpanjangan('sudah')">
+        <span class="popup-pilihan-icon">✅</span>
+        <div class="popup-pilihan-text">
+          <strong>Sudah pernah daftar online</strong>
+          <small>Data lama akan otomatis terisi — hanya perlu upload berkas & pilih tanggal baru</small>
+        </div>
+        <i class="bi bi-arrow-right"></i>
+      </button>
+      <button class="popup-pilihan-btn" onclick="pilihPerpanjangan('belum')">
+        <span class="popup-pilihan-icon">📝</span>
+        <div class="popup-pilihan-text">
+          <strong>Belum pernah daftar online</strong>
+          <small>Mengisi formulir dari awal dengan berkas tambahan perpanjangan</small>
+        </div>
+        <i class="bi bi-arrow-right"></i>
+      </button>
+    </div>
+
+    <!-- PERPANJANGAN: input nomor ref (sudah pernah) -->
+    <div id="popupRefView" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <button onclick="backToPerpanjangan()" style="background:none;border:none;cursor:pointer;color:#5a6e85;font-size:13px;display:flex;align-items:center;gap:4px;">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+      </div>
+      <div class="popup-welcome-badge" style="background:#e8f4ff;color:#1a5cb5;margin-bottom:12px;">🔍 Cari Data Lama</div>
+      <p style="font-size:13.5px;color:#5a6e85;margin-bottom:16px;line-height:1.6;">
+        Masukkan <strong>nomor referensi</strong> dari email pendaftaran sebelumnya.<br>
+        Format: <code style="background:#f0f4f8;padding:2px 6px;border-radius:4px;font-size:12px;">KBP-YYYYMMDD-HHMM</code>
+      </p>
+      <div style="position:relative;margin-bottom:8px;">
+        <input type="text" id="inputRefPerpanjangan"
+          class="form-control" placeholder="Contoh: KBP-20260101-0900"
+          style="width:100%;box-sizing:border-box;padding-right:40px;"
+          oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div id="refPerpanjanganError" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px;">
+        <i class="bi bi-exclamation-circle"></i> <span id="refPerpanjanganErrorMsg">Nomor referensi tidak valid</span>
+      </div>
+      <button class="popup-ok" id="btnCariDataLama" onclick="cariDataLamaPerpanjangan()">
+        <i class="bi bi-search"></i> Cari Data Saya
+      </button>
+      <p style="font-size:11.5px;color:#8a9bb5;margin-top:10px;text-align:center;">
+        Nomor referensi tertera di email konfirmasi pendaftaran Anda.<br>
+        Status pengajuan harus <strong>Selesai</strong> untuk bisa diperpanjang.
+      </p>
+    </div>
+
+    <!-- PERPANJANGAN: info persiapan berkas (belum pernah / setelah data ditemukan) -->
+    <div id="popupInfoPerpanjanganView" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <button onclick="backToPerpanjangan()" style="background:none;border:none;cursor:pointer;color:#5a6e85;font-size:13px;display:flex;align-items:center;gap:4px;" id="btnBackInfoPerpanjangan">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+      </div>
+      <div class="popup-welcome-badge" style="background:#e8f4ff;color:#1a5cb5;margin-bottom:12px;" id="infoPerpanjanganBadge">📋 Persiapan Berkas</div>
+      <p style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:12px;" id="infoPerpanjanganTitle">
+        Siapkan berkas perpanjangan berikut:
+      </p>
+      <div id="infoPerpanjanganList"></div>
+      <button class="popup-ok" id="btnMulaiPerpanjangan" onclick="mulaiFormPerpanjangan()">
+        <i class="bi bi-arrow-right-circle"></i> <span id="btnMulaiPerpanjanganText">Mulai Mengisi Formulir</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== POPUP INFO BERKAS (Registrasi Baru) ===== -->
+<div id="popupInfoBaru" class="popup-modal" style="display:none;">
+  <div class="popup-content">
+    <img src="src/NEW_LOGO.jpg" alt="Si-Reino" class="popup-image">
+    <div class="popup-welcome-badge">📋 Persiapan Berkas</div>
+    <div class="popup-title" style="font-size:17px;">Registrasi Baru</div>
+    <div class="popup-divider"></div>
+
     <div class="popup-tips">
       <div class="popup-tip-item">
         <span class="popup-tip-icon">📁</span>
         <div>
-          <strong>Siapkan 5 berkas berikut:</strong>
+          <strong>Siapkan 5 berkas berikut (PDF):</strong>
           <ul class="popup-tip-list">
             <li>KTP</li>
             <li>Surat Pengantar dari Kampus</li>
@@ -483,7 +643,6 @@
         </div>
       </div>
     </div>
-
     <div class="popup-tips" style="margin-bottom:4px;">
       <div class="popup-tip-item">
         <span class="popup-tip-icon">📦</span>
@@ -497,7 +656,7 @@
       </div>
     </div>
 
-    <button class="popup-ok" onclick="closeWelcomePopup()">
+    <button class="popup-ok" onclick="mulaiFormBaru()">
       <i class="bi bi-arrow-right-circle"></i> Mulai mengisi formulir
     </button>
     <button class="popup-back" onclick="konfirmasiKembali()">

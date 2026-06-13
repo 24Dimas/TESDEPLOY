@@ -1832,3 +1832,94 @@ select.form-control:focus {
   justify-content: center; flex-wrap: wrap;
   margin-top: 14px;
 }
+
+/* ===== OPD MODE TOGGLE ===== */
+.opd-mode-toggle {
+  margin-bottom: 12px;
+}
+.opd-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  user-select: none;
+}
+.opd-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+.opd-lampiran-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff8e6;
+  border: 1.5px solid #f0c04a;
+  border-left: 4px solid #d4a017;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #7a5200;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.opd-lampiran-info i {
+  font-size: 17px;
+  color: #d4a017;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ===== POPUP PILIHAN TIPE (Baru / Perpanjangan) ===== */
+.popup-pilihan-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-card, #fff);
+  border: 1.5px solid var(--border, #d5e0ee);
+  border-radius: 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 10px;
+  text-align: left;
+}
+.popup-pilihan-btn:hover {
+  border-color: var(--primary, #2558a3);
+  background: #f0f6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,88,163,0.12);
+}
+.popup-pilihan-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.popup-pilihan-text {
+  flex: 1;
+  min-width: 0;
+}
+.popup-pilihan-text strong {
+  display: block;
+  font-size: 14px;
+  color: var(--primary-dark, #1a3a5c);
+  font-weight: 700;
+}
+.popup-pilihan-text small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted, #6c8194);
+  margin-top: 2px;
+  font-weight: 400;
+}
+.popup-pilihan-btn > i.bi-arrow-right {
+  color: var(--text-muted, #6c8194);
+  font-size: 15px;
+  flex-shrink: 0;
+}

@@ -1,0 +1,12 @@
+# ============================================================
+# Si-Reino — Cloudflare Pages Redirects
+# Format: [from] [to] [status code]
+# Pretty URLs (.html stripping) sudah otomatis di CF Pages.
+# Ini cuma untuk backward compatibility: link lama dgn .html → bersih
+# ============================================================
+
+/form.html               /form               301
+/cek-status.html         /cek-status         301
+/admin/login.html        /admin/login        301
+/admin/dashboard.html    /admin/dashboard    301
+/index.html              /                   301

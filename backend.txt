@@ -1,8 +1,12 @@
 // ============================================================
-// KONFIGURASI — URL FRONTEND (ubah saat deploy)
+// KONFIGURASI — URL FRONTEND (UBAH SETELAH DEPLOY)
 // Dipakai untuk membentuk link revisi di email penolakan.
+//
+// PENTING: Ubah URL di bawah ini setelah deploy ke Cloudflare Pages.
+// Format Cloudflare Pages: https://[nama-project].pages.dev
+// Atau custom domain kalau sudah disetup.
 // ============================================================
-var FRONTEND_BASE_URL = "https://tessireino.netlify.app";
+var FRONTEND_BASE_URL = "https://sireino.pages.dev";
 
 function doPost(e) {
   // ===== LOGIN ADMIN via POST (aman, tidak lewat URL) =====
@@ -176,7 +180,7 @@ function kirimEmailKonfirmasi(e, refNum, isRevisi) {
 
 
         var subject = isRevisi
-          ? "✅ Revisi Pengajuan Diterima – Kesbangpol Kudus [" + refNum + "]"
+          ? "🔄 Revisi Pengajuan Diterima – Kesbangpol Kudus [" + refNum + "]"
           : "✅ Registrasi Penelitian Diterima – Kesbangpol Kudus [" + refNum + "]";
 
         var htmlBody = `
@@ -346,6 +350,8 @@ function doGet(e) {
     return handleCheckStatus(e);
   } else if (action === "getDataByRef") {
     return handleGetDataByRef(e);
+  } else if (action === "getDataByRefPerpanjangan") {
+    return handleGetDataByRefPerpanjangan(e);
   }
  
   return ContentService
@@ -353,7 +359,40 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ===== GET DATA BY REF (untuk revisi auto-fill) =====
+// ===== GET DATA FOR PERPANJANGAN (hanya status Selesai) =====
+function handleGetDataByRefPerpanjangan(e) {
+  try {
+    const ref = (e.parameter.ref || "").trim();
+    if (!ref) return jsonResponse({ found: false, error: "Nomor referensi tidak ada" });
+
+    const doc = SpreadsheetApp.openById('1p5vDE8-dQbLxQbaxeE9nknDQ0W53QBqibE9qxmOa-0Q');
+    const sheet = doc.getSheetByName('Data');
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0].map(function(h){ return h.toString().toLowerCase().trim(); });
+    const refCol    = headers.indexOf('ref_number');
+    const statusCol = headers.indexOf('status');
+    if (refCol < 0 || statusCol < 0) return jsonResponse({ found: false, error: "Kolom tidak ditemukan" });
+
+    for (var i = 1; i < values.length; i++) {
+      var rowRef    = values[i][refCol]    ? values[i][refCol].toString().trim()    : "";
+      var rowStatus = values[i][statusCol] ? values[i][statusCol].toString().trim() : "";
+      if (rowRef === ref) {
+        // Hanya boleh perpanjang kalau status "Selesai"
+        if (rowStatus.toLowerCase() !== "selesai") {
+          return jsonResponse({ found: false, error: "Pengajuan ini belum selesai (status: " + rowStatus + "). Hanya pengajuan berstatus Selesai yang dapat diperpanjang." });
+        }
+        var row = {};
+        headers.forEach(function(h, idx) {
+          row[h] = values[i][idx] ? values[i][idx].toString() : "";
+        });
+        return jsonResponse({ found: true, data: row });
+      }
+    }
+    return jsonResponse({ found: false, error: "Nomor referensi tidak ditemukan" });
+  } catch (err) {
+    return jsonResponse({ found: false, error: err.toString() });
+  }
+}
 // Return data row by ref_number, HANYA jika status "Ditolak" (security)
 function handleGetDataByRef(e) {
   try {
@@ -725,8 +764,10 @@ function handleGenerateSurat(e) {
     const row = {};
     headers.forEach((h, idx) => { row[h] = rowData[idx] ? rowData[idx].toString() : ""; });
  
+    const namaDepan = (row.nama || "Tanpa Nama").split(" ").slice(0,2).join(" ");
+    const refNum    = row.ref_number || "";
     const copy = DriveApp.getFileById(TEMPLATE_ID).makeCopy(
-      `Surat Penelitian - ${row.nama || "Tanpa Nama"}`,
+      `Surat Penelitian - ${namaDepan}${refNum ? " (" + refNum + ")" : ""}`,
       DriveApp.getFolderById(FOLDER_ID)
     );
  

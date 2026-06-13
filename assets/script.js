@@ -149,13 +149,21 @@
     });
 
     if (n === 3) {
-      const opdInputs = $$('.opd-input');
+      // Cek OPD — skip kalau mode lampiran
+      const lampiranToggle = document.getElementById('opdLampiranToggle');
+      const isLampiranMode = lampiranToggle && lampiranToggle.checked;
       const opdW = $('opd-wrapper');
-      if (!opdInputs.some(i => i.value.trim()) || !opdInputs.length) {
-        opdW.classList.add('error', 'has-error');
-        if (!firstError) firstError = opdInputs[0] || opdW;
-        hasErr = true;
-      } else { opdW.classList.remove('error', 'has-error'); updateOPDHidden(); }
+      if (!isLampiranMode) {
+        const opdInputs = $$('.opd-input');
+        if (!opdInputs.some(i => i.value.trim()) || !opdInputs.length) {
+          opdW.classList.add('error', 'has-error');
+          if (!firstError) firstError = opdInputs[0] || opdW;
+          hasErr = true;
+        } else { opdW.classList.remove('error', 'has-error'); updateOPDHidden(); }
+      } else {
+        opdW.classList.remove('error', 'has-error');
+        $('lokasi').value = 'Lampiran';
+      }
 
       if ($('opsi_anggota').value === 'ada') {
         const ai = $$('.anggota-input');
@@ -197,6 +205,20 @@
     showStep(t);
   };
 
+  // ========== OPD MODE TOGGLE ==========
+  window.toggleOPDMode = function () {
+    const isLampiran = document.getElementById('opdLampiranToggle').checked;
+    document.getElementById('opd-manual').style.display  = isLampiran ? 'none' : 'block';
+    document.getElementById('opd-lampiran').style.display = isLampiran ? 'block' : 'none';
+    if (isLampiran) {
+      $('lokasi').value = 'Lampiran';
+      $('opd-wrapper').classList.remove('error', 'has-error');
+    } else {
+      updateOPDHidden();
+    }
+    debouncedSaveDraft();
+  };
+
   // ========== OPD ==========
   window.tambahOPD = function () {
     const list = $('opd-list');
@@ -226,6 +248,9 @@
   };
 
   window.updateOPDHidden = function () {
+    // Skip kalau mode lampiran aktif
+    const toggle = document.getElementById('opdLampiranToggle');
+    if (toggle && toggle.checked) { $('lokasi').value = 'Lampiran'; return; }
     const filled = $$('.opd-input').filter(i => i.value.trim());
     $('lokasi').value = filled.length === 1 ? filled[0].value.trim()
       : filled.map((i, idx) => `${idx+1}. ${i.value.trim()}`).join(', ');
@@ -240,11 +265,11 @@
       if (!$$('.anggota-input').length) tambahAnggota();
     } else if (v === '-') {
       $('anggota-wrapper').style.display = 'none';
-      $('anggota_peneliti').value = '-';
+      $('anggota_peneliti').value = '-'; // otomatis isi "-"
       $('anggota-list').innerHTML = '';
     } else {
       $('anggota-wrapper').style.display = 'none';
-      $('anggota_peneliti').value = '';
+      $('anggota_peneliti').value = '-'; // default juga "-"
     }
   };
 
@@ -512,6 +537,196 @@
     reader.readAsDataURL(file);
   }
 
+  // ========== POPUP TIPE PENGAJUAN ==========
+  let modePerpanjangan = null; // null | 'baru' | 'perpanjangan-belum' | 'perpanjangan-sudah'
+
+  window.pilihTipePengajuan = function(tipe) {
+    if (tipe === 'baru') {
+      closeModal('popupModal');
+      openModal('popupInfoBaru');
+    } else {
+      document.getElementById('popupTipeView').style.display = 'none';
+      document.getElementById('popupPerpanjanganView').style.display = 'block';
+    }
+  };
+
+  window.backToTipe = function() {
+    document.getElementById('popupPerpanjanganView').style.display = 'none';
+    document.getElementById('popupRefView').style.display = 'none';
+    document.getElementById('popupInfoPerpanjanganView').style.display = 'none';
+    document.getElementById('popupTipeView').style.display = 'block';
+  };
+
+  window.backToPerpanjangan = function() {
+    document.getElementById('popupRefView').style.display = 'none';
+    document.getElementById('popupInfoPerpanjanganView').style.display = 'none';
+    document.getElementById('popupPerpanjanganView').style.display = 'block';
+  };
+
+  window.pilihPerpanjangan = function(tipe) {
+    if (tipe === 'sudah') {
+      // Pernah daftar online → minta nomor ref
+      document.getElementById('popupPerpanjanganView').style.display = 'none';
+      document.getElementById('popupRefView').style.display = 'block';
+    } else {
+      // Belum pernah daftar online → isi dari 0 + berkas tambahan
+      modePerpanjangan = 'perpanjangan-belum';
+      document.getElementById('popupPerpanjanganView').style.display = 'none';
+      showInfoPerpanjanganBelum();
+    }
+  };
+
+  function showInfoPerpanjanganBelum() {
+    const list = document.getElementById('infoPerpanjanganList');
+    list.innerHTML = `
+      <div class="popup-tips" style="margin-bottom:8px;">
+        <div class="popup-tip-item">
+          <span class="popup-tip-icon">📁</span>
+          <div>
+            <strong>Siapkan semua berkas berikut (PDF):</strong>
+            <ul class="popup-tip-list">
+              <li>KTP</li>
+              <li>Surat Pengantar dari Kampus</li>
+              <li>Proposal Penelitian (diperbarui)</li>
+              <li>Surat Pernyataan</li>
+              <li>Surat Permohonan</li>
+              <li style="color:#1a5cb5;font-weight:600;">+ Surat Rekomendasi Penelitian Lama</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="popup-tips" style="margin-bottom:4px;">
+        <div class="popup-tip-item">
+          <span class="popup-tip-icon">📦</span>
+          <div>Gabungkan <strong>semua menjadi 1 file ZIP/RAR</strong> termasuk surat rekomendasi lama.</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('infoPerpanjanganBadge').textContent = '📋 Persiapan Berkas Perpanjangan';
+    document.getElementById('infoPerpanjanganTitle').textContent = 'Siapkan berkas perpanjangan berikut:';
+    document.getElementById('btnMulaiPerpanjanganText').textContent = 'Mulai Mengisi Formulir';
+    document.getElementById('btnBackInfoPerpanjangan').onclick = backToPerpanjangan;
+    document.getElementById('popupInfoPerpanjanganView').style.display = 'block';
+  }
+
+  function showInfoPerpanjanganSudah(dataLama) {
+    const list = document.getElementById('infoPerpanjanganList');
+    list.innerHTML = `
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;">
+        <p style="margin:0 0 6px;font-weight:700;color:#0c4a6e;">✓ Data lama ditemukan:</p>
+        <p style="margin:0;color:#1a3a5c;"><strong>${dataLama.nama || '—'}</strong> · ${dataLama.nama_lembaga || dataLama.lembaga || '—'}</p>
+        <p style="margin:4px 0 0;color:#5a6e85;font-size:12px;">${dataLama.proposal || '—'}</p>
+      </div>
+      <div class="popup-tips" style="margin-bottom:8px;">
+        <div class="popup-tip-item">
+          <span class="popup-tip-icon">📎</span>
+          <div>
+            <strong>Yang perlu Anda siapkan:</strong>
+            <ul class="popup-tip-list">
+              <li>Surat Rekomendasi Penelitian Lama (PDF)</li>
+              <li>Berkas lain yang perlu diperbarui (PDF)</li>
+            </ul>
+            Gabungkan dalam <strong>1 file ZIP/RAR</strong>.
+          </div>
+        </div>
+      </div>
+      <div class="popup-tips" style="margin-bottom:4px;">
+        <div class="popup-tip-item">
+          <span class="popup-tip-icon">📅</span>
+          <div>Data lama akan <strong>otomatis terisi</strong>. Anda hanya perlu memilih <strong>tanggal penelitian baru</strong>.</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('infoPerpanjanganBadge').textContent = '✅ Data Ditemukan';
+    document.getElementById('infoPerpanjanganTitle').textContent = 'Siap melanjutkan perpanjangan:';
+    document.getElementById('btnMulaiPerpanjanganText').textContent = 'Mulai Perpanjangan';
+    document.getElementById('btnBackInfoPerpanjangan').onclick = backToPerpanjangan;
+    document.getElementById('popupRefView').style.display = 'none';
+    document.getElementById('popupInfoPerpanjanganView').style.display = 'block';
+  }
+
+  window.cariDataLamaPerpanjangan = async function() {
+    const ref = document.getElementById('inputRefPerpanjangan').value.trim();
+    const errBox = document.getElementById('refPerpanjanganError');
+    const errMsg = document.getElementById('refPerpanjanganErrorMsg');
+    const btn = document.getElementById('btnCariDataLama');
+
+    if (!ref) {
+      errMsg.textContent = 'Nomor referensi wajib diisi';
+      errBox.style.display = 'block'; return;
+    }
+    if (!/^KBP-\d{8}-\d{4}$/i.test(ref)) {
+      errMsg.textContent = 'Format tidak valid. Contoh: KBP-20260101-0900';
+      errBox.style.display = 'block'; return;
+    }
+    errBox.style.display = 'none';
+    btn.innerHTML = '<span class="loading-dots"><i class="bi bi-hourglass-split"></i></span> Mencari...';
+    btn.disabled = true;
+
+    try {
+      const cfg = window.SIREINO_CONFIG || {};
+      const res = await fetch(`${cfg.API_URL}?action=getDataByRefPerpanjangan&ref=${encodeURIComponent(ref.toUpperCase())}`);
+      const json = await res.json();
+      if (!json.found) {
+        errMsg.textContent = json.error || 'Data tidak ditemukan atau status belum Selesai';
+        errBox.style.display = 'block';
+        btn.innerHTML = '<i class="bi bi-search"></i> Cari Data Saya';
+        btn.disabled = false; return;
+      }
+      modePerpanjangan = 'perpanjangan-sudah';
+      window._dataLamaPerpanjangan = json.data;
+      showInfoPerpanjanganSudah(json.data);
+    } catch(e) {
+      errMsg.textContent = 'Gagal terhubung ke server. Coba lagi.';
+      errBox.style.display = 'block';
+    } finally {
+      btn.innerHTML = '<i class="bi bi-search"></i> Cari Data Saya';
+      btn.disabled = false;
+    }
+  };
+
+  window.mulaiFormBaru = function() {
+    modePerpanjangan = null;
+    $('jenis_pengajuan').value = 'baru';
+    closeModal('popupInfoBaru');
+    // Reset field perpanjangan
+    document.getElementById('nomorSuratLamaBox').style.display = 'none';
+    document.getElementById('perpanjanganBanner').style.display = 'none';
+  };
+
+  window.mulaiFormPerpanjangan = function() {
+    $('jenis_pengajuan').value = 'perpanjangan';
+    closeModal('popupModal');
+
+    // Tampilkan banner perpanjangan
+    const banner = document.getElementById('perpanjanganBanner');
+    banner.style.display = 'flex';
+
+    // Tampilkan field nomor surat lama
+    document.getElementById('nomorSuratLamaBox').style.display = 'block';
+
+    if (modePerpanjangan === 'perpanjangan-sudah' && window._dataLamaPerpanjangan) {
+      // Auto-fill data lama, clear tanggal (user isi ulang)
+      fillFormFromData(window._dataLamaPerpanjangan, null);
+      $('tanggal_mulai').value = '';
+      $('tanggal_selesai').value = '';
+      document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
+        'Data lama sudah terisi otomatis. Silakan perbarui tanggal penelitian dan upload berkas baru.';
+    } else {
+      document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
+        'Anda sedang mengisi formulir perpanjangan. Lengkapi semua data dan sertakan surat rekomendasi lama di ZIP.';
+    }
+
+    // Update step fields: tambah nomor_surat_lama ke step 2
+    if (!STEP_FIELDS[2].includes('nomor_surat_lama')) {
+      STEP_FIELDS[2].unshift('nomor_surat_lama');
+    }
+
+    showStep(1);
+  };
+
+  window.closeWelcomePopup = function() { mulaiFormBaru(); };
+
   // ========== REVISI MODE — auto-fill dari ref number ==========
   function checkRevisiMode() {
     const params = new URLSearchParams(window.location.search);
@@ -660,6 +875,11 @@
 
     // Welcome popup hanya kalau BUKAN revisi
     if (!isRevisi) {
+      // Reset popup ke view awal (tipe pilihan)
+      document.getElementById('popupTipeView').style.display = 'block';
+      document.getElementById('popupPerpanjanganView').style.display = 'none';
+      document.getElementById('popupRefView').style.display = 'none';
+      document.getElementById('popupInfoPerpanjanganView').style.display = 'none';
       openModal('popupModal');
     }
 
