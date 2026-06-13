@@ -552,7 +552,7 @@
     let h = data.length + '|';
     for (let i = 0; i < data.length; i++) {
       const r = data[i];
-      h += (r.ref_number || '') + ':' + (r.status || '') + ':' + (r.revisi_count || '0') + ':' + (r.jenis_pengajuan || '') + ';';
+      h += (r.ref_number || '') + ':' + (r.status || '') + ':' + (r.revisi_count || '0') + ':' + (r.jenis_pengajuan || '') + ':' + (r.perpanjang_count || '0') + ';';
     }
     return h;
   }
@@ -761,7 +761,7 @@
         <td class="td-nama">${escHtml(r.nama)}</td>
         <td class="td-judul"><span>${escHtml(r.proposal)}</span></td>
         <td>${formatDate(r.timestamp)}</td>
-        <td>${badgeStatus(r.status, r.revisi_count, r.jenis_pengajuan)}</td>
+        <td>${badgeStatus(r.status, r.revisi_count, r.jenis_pengajuan, r.perpanjang_count)}</td>
       </tr>
     `).join("");
   }
@@ -792,7 +792,7 @@
         <td class="td-judul"><span>${escHtml(r.proposal)}</span></td>
         <td style="font-size:12.5px">${escHtml(r.lokasi)}</td>
         <td style="font-size:12.5px;color:var(--primary-light)">${escHtml(r.email)}</td>
-        <td>${badgeStatus(r.status, r.revisi_count, r.jenis_pengajuan)}</td>
+        <td>${badgeStatus(r.status, r.revisi_count, r.jenis_pengajuan, r.perpanjang_count)}</td>
         <td>
           <div class="dropdown-action">
             <button class="btn-dots" onclick="toggleActionMenu(event, ${r.rowIndex})">
@@ -1383,7 +1383,7 @@
     document.getElementById(id).classList.remove("show");
   }
 
-  function badgeStatus(status, revisiCount, jenisPengajuan) {
+  function badgeStatus(status, revisiCount, jenisPengajuan, perpanjangCount) {
     const map = {
       "Pending":  `<span class="badge badge-pending">⏳ Pending</span>`,
       "Diproses": `<span class="badge badge-proses">🔄 Diproses</span>`,
@@ -1393,7 +1393,8 @@
     let html = map[status] || map["Pending"];
     // Badge perpanjangan
     if (jenisPengajuan === 'perpanjangan') {
-      html += ` <span class="badge-perpanjangan" title="Pengajuan perpanjangan surat">🔁 Perpanjangan</span>`;
+      const pc = parseInt(perpanjangCount) || 0;
+      html += ` <span class="badge-perpanjangan" title="Pengajuan perpanjangan surat${pc>0?' ke-'+pc:''}">🔁 ${pc>0?'P'+pc:'Perpanjangan'}</span>`;
     }
     // Badge revisi
     const rc = parseInt(revisiCount) || 0;

@@ -25,32 +25,49 @@ function doPost(e) {
         var filename = e.parameter.filename;
         var email = e.parameter.email;
         var nama = e.parameter.nama;
-        var revisiRef = (e.parameter.revisi_ref || "").trim(); // <-- revisi support
+        var revisiRef       = (e.parameter.revisi_ref || "").trim();
+        var perpanjangRef   = (e.parameter.perpanjang_ref || "").trim();
 
         var refNum;
-        var isRevisi = false;
+        var isRevisi       = false;
+        var isPerpanjangan = false;
 
-        // Cek apakah ini revisi: revisi_ref ada DAN row dengan ref tsb ada DAN status "Ditolak"
-        if (revisiRef) {
+        // Cek perpanjangan dulu (status Selesai → UPDATE row lama)
+        if (perpanjangRef) {
+          var checkPerpanjang = findRowByRefForPerpanjangan_(perpanjangRef);
+          if (checkPerpanjang > 0) {
+            isPerpanjangan = true;
+            refNum = perpanjangRef; // tetap pakai nomor ref lama
+          }
+        }
+
+        // Cek revisi (status Ditolak → UPDATE row lama)
+        if (!isPerpanjangan && revisiRef) {
           var checkRow = findRowByRefForRevisi_(revisiRef);
           if (checkRow > 0) {
             isRevisi = true;
-            refNum = revisiRef; // tetap pakai nomor ref lama
+            refNum = revisiRef;
           }
         }
+
         if (!refNum) {
-          // Generate nomor referensi baru
+          // Generate nomor referensi baru (pendaftaran baru)
           refNum = "KBP-" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmm");
         }
 
         var result = uploadFileToGoogleDrive(data, filename, nama, email, e, refNum);
 
-        // Kirim email konfirmasi (template beda untuk revisi)
-        kirimEmailKonfirmasi(e, refNum, isRevisi);
+        // Kirim email konfirmasi
+        kirimEmailKonfirmasi(e, refNum, isRevisi, isPerpanjangan);
 
         return ContentService
             .createTextOutput(
-                JSON.stringify({"Anda berhasil mendaftar": isRevisi ? "Data revisi telah terkirim" : "Data telah terkirim", "ref": refNum, "isRevisi": isRevisi})
+                JSON.stringify({
+                  "Anda berhasil mendaftar": isPerpanjangan ? "Perpanjangan berhasil dikirim" : isRevisi ? "Data revisi telah terkirim" : "Data telah terkirim",
+                  "ref": refNum,
+                  "isRevisi": isRevisi,
+                  "isPerpanjangan": isPerpanjangan
+                })
             )
             .setMimeType(ContentService.MimeType.JSON);
     } catch (error) {
@@ -82,6 +99,27 @@ function findRowByRefForRevisi_(refNumber) {
   return -1;
 }
 
+// Helper: cari row dgn ref number, hanya jika status "Selesai" (untuk perpanjangan)
+function findRowByRefForPerpanjangan_(refNumber) {
+  try {
+    var doc = SpreadsheetApp.openById('1p5vDE8-dQbLxQbaxeE9nknDQ0W53QBqibE9qxmOa-0Q');
+    var sheet = doc.getSheetByName('Data');
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0].map(function(h){ return h.toString().toLowerCase().trim(); });
+    var refCol = headers.indexOf('ref_number');
+    var statusCol = headers.indexOf('status');
+    if (refCol < 0 || statusCol < 0) return -1;
+    for (var i = 1; i < values.length; i++) {
+      var ref = values[i][refCol] ? values[i][refCol].toString().trim() : "";
+      var status = values[i][statusCol] ? values[i][statusCol].toString().trim() : "";
+      if (ref === refNumber && status.toLowerCase() === "selesai") {
+        return i + 1;
+      }
+    }
+  } catch (err) { Logger.log("findRowByRefForPerpanjangan_ error: " + err); }
+  return -1;
+}
+
 function record_data(e, fileUrl, refNum) {
     try {
         var doc = SpreadsheetApp.openById('1p5vDE8-dQbLxQbaxeE9nknDQ0W53QBqibE9qxmOa-0Q');
@@ -89,11 +127,18 @@ function record_data(e, fileUrl, refNum) {
         var timestamp = new Date();
         var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-        // Cek apakah ini revisi
-        var revisiRef = (e.parameter.revisi_ref || "").trim();
-        var targetRow = -1;
-        var isRevisi = false;
-        if (revisiRef) {
+        // Cek apakah ini perpanjangan (prioritas: perpanjangan > revisi)
+        var perpanjangRef = (e.parameter.perpanjang_ref || "").trim();
+        var revisiRef     = (e.parameter.revisi_ref || "").trim();
+        var targetRow     = -1;
+        var isRevisi      = false;
+        var isPerpanjangan = false;
+
+        if (perpanjangRef) {
+          targetRow = findRowByRefForPerpanjangan_(perpanjangRef);
+          if (targetRow > 0) isPerpanjangan = true;
+        }
+        if (!isPerpanjangan && revisiRef) {
           targetRow = findRowByRefForRevisi_(revisiRef);
           if (targetRow > 0) isRevisi = true;
         }
@@ -105,26 +150,42 @@ function record_data(e, fileUrl, refNum) {
         for (var i = 1; i < headers.length; i++) {
             var h = headers[i].toString().toLowerCase().trim();
             if (h == "file")               row.push(fileUrl);
-            else if (h == "status")        row.push("Pending"); // revisi: status balik ke Pending
+            else if (h == "status")        row.push("Pending"); // semua mode → balik ke Pending
             else if (h == "ref_number")    row.push(refNum || "");
             else if (h == "revisi_count") {
-              // Increment counter kalau revisi
               if (isRevisi) {
                 var currentVal = sheet.getRange(targetRow, i + 1).getValue();
                 var count = parseInt(currentVal) || 0;
                 row.push(count + 1);
               } else {
+                row.push(0); // perpanjangan reset revisi_count ke 0
+              }
+            }
+            else if (h == "perpanjang_count") {
+              if (isPerpanjangan) {
+                var currentPerpanjang = sheet.getRange(targetRow, i + 1).getValue();
+                var countP = parseInt(currentPerpanjang) || 0;
+                row.push(countP + 1);
+              } else {
                 row.push(0);
               }
             }
-            else                           row.push(e.parameter[headers[i]] || "");
+            else {
+              // Untuk perpanjangan: update field yang dikirim, pertahankan yang tidak dikirim
+              if (isPerpanjangan && !e.parameter[headers[i]]) {
+                // Ambil nilai lama dari sheet
+                row.push(sheet.getRange(targetRow, i + 1).getValue() || "");
+              } else {
+                row.push(e.parameter[headers[i]] || "");
+              }
+            }
         }
 
-        if (isRevisi && targetRow > 0) {
+        if ((isRevisi || isPerpanjangan) && targetRow > 0) {
           // UPDATE row yang sudah ada
           sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
         } else {
-          // APPEND row baru
+          // APPEND row baru (pendaftaran baru)
           var nextRow = sheet.getLastRow() + 1;
           sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
         }
@@ -165,7 +226,7 @@ function formatTanggalIndonesia(date) {
   return `${tanggal} ${bulan} ${tahun}`;
 }
 
-function kirimEmailKonfirmasi(e, refNum, isRevisi) {
+function kirimEmailKonfirmasi(e, refNum, isRevisi, isPerpanjangan) {
     try {
         var emailPemohon = e.parameter.email;
         var nama         = e.parameter.nama            || "-";
@@ -178,8 +239,9 @@ function kirimEmailKonfirmasi(e, refNum, isRevisi) {
 
         if (!emailPemohon) return;
 
-
-        var subject = isRevisi
+        var subject = isPerpanjangan
+          ? "🔁 Perpanjangan Surat Penelitian Diterima – Kesbangpol Kudus [" + refNum + "]"
+          : isRevisi
           ? "🔄 Revisi Pengajuan Diterima – Kesbangpol Kudus [" + refNum + "]"
           : "✅ Registrasi Penelitian Diterima – Kesbangpol Kudus [" + refNum + "]";
 
@@ -580,6 +642,8 @@ function handleSendEmail(e) {
       subject    = "✅ Surat Rekomendasi Penelitian Siap – Kesbangpol Kudus";
       bannerBg   = "#1a9e5c";
       bannerText = "✓ &nbsp;Surat Rekomendasi Penelitian Anda Telah Siap";
+      var refNumber = row.ref_number || "";
+      var perpanjangUrl = FRONTEND_BASE_URL + "/form";
       bodyContent = `
         <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a2b3c;">
           Kepada Yth. <strong>${nama}</strong>,
@@ -604,6 +668,18 @@ function handleSendEmail(e) {
             <p style="margin:0;font-family:Arial,sans-serif;font-size:13.5px;color:#1a2b3c;line-height:1.7;">${bodyTambahan}</p>
           </td></tr>
         </table>` : ""}
+
+        <!-- NOMOR REFERENSI + PERPANJANGAN -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fbff;border:1px solid #c8dcf5;border-radius:12px;margin-bottom:24px;">
+          <tr><td style="padding:18px 20px;">
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#2558a3;text-transform:uppercase;letter-spacing:1px;">Simpan Nomor Referensi Anda</p>
+            <p style="margin:0 0 10px;font-family:Arial,sans-serif;font-size:22px;font-weight:800;color:#1a3a5c;letter-spacing:1px;">${refNumber}</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;color:#6b7a8d;line-height:1.6;">
+              Simpan nomor ini baik-baik. Nomor referensi diperlukan apabila Bapak/Ibu ingin <strong>memperpanjang izin penelitian</strong> di kemudian hari melalui website Si-Reino.
+            </p>
+          </td></tr>
+        </table>
+
         ${penutup}`;
 
     } else if (subjectType === "info") {

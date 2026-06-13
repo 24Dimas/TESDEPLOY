@@ -222,7 +222,16 @@
   // ========== OPD ==========
   window.tambahOPD = function () {
     const list = $('opd-list');
-    const i = list.children.length + 1;
+    const current = list.children.length;
+    if (current >= 3) {
+      // Sudah 3 — arahkan ke mode lampiran
+      showCustomAlert(
+        'Maksimal 3 OPD untuk diisi manual. Untuk lebih dari 3 OPD, centang opsi <strong>"OPD lebih dari 3 / pakai lampiran"</strong> di atas.',
+        'Batas OPD Tercapai', 'ℹ️'
+      );
+      return;
+    }
+    const i = current + 1;
     const row = document.createElement('div');
     row.className = 'anggota-row';
     row.innerHTML = `
@@ -236,6 +245,7 @@
     `;
     list.appendChild(row);
     updateOPDHidden();
+    updateTambahOPDBtn();
   };
 
   window.hapusOPD = function (btn) {
@@ -245,7 +255,24 @@
       r.querySelector('input').placeholder = `Nama OPD / Bidang ke-${i + 1}`;
     });
     updateOPDHidden();
+    updateTambahOPDBtn();
   };
+
+  // Update tampilan tombol Tambah OPD berdasarkan jumlah
+  function updateTambahOPDBtn() {
+    const btn = document.querySelector('#opd-manual .btn-tambah-anggota');
+    if (!btn) return;
+    const count = $$('#opd-list .anggota-row').length;
+    if (count >= 3) {
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      btn.title = 'Maksimal 3 OPD. Gunakan opsi lampiran untuk lebih dari 3.';
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.title = '';
+    }
+  }
 
   window.updateOPDHidden = function () {
     // Skip kalau mode lampiran aktif
@@ -706,18 +733,29 @@
     document.getElementById('nomorSuratLamaBox').style.display = 'block';
 
     if (modePerpanjangan === 'perpanjangan-sudah' && window._dataLamaPerpanjangan) {
-      // Auto-fill data lama, clear tanggal (user isi ulang)
+      // Simpan ref lama sebagai perpanjang_ref (UPDATE row lama, bukan INSERT baru)
+      let hiddenPerpanjang = document.querySelector('input[name="perpanjang_ref"]');
+      if (!hiddenPerpanjang) {
+        hiddenPerpanjang = document.createElement('input');
+        hiddenPerpanjang.type = 'hidden';
+        hiddenPerpanjang.name = 'perpanjang_ref';
+        $('uploadForm').appendChild(hiddenPerpanjang);
+      }
+      hiddenPerpanjang.value = window._dataLamaPerpanjangan.ref_number || '';
+
+      // Auto-fill data lama, kosongkan tanggal (user isi ulang)
       fillFormFromData(window._dataLamaPerpanjangan, null);
       $('tanggal_mulai').value = '';
       $('tanggal_selesai').value = '';
       document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
-        'Data lama sudah terisi otomatis. Silakan perbarui tanggal penelitian dan upload berkas baru.';
+        'Data lama sudah terisi otomatis. Perbarui tanggal penelitian baru dan upload berkas (termasuk surat rekomendasi lama).';
     } else {
+      // Perpanjangan baru (belum pernah isi online) → INSERT row baru
       document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
-        'Anda sedang mengisi formulir perpanjangan. Lengkapi semua data dan sertakan surat rekomendasi lama di ZIP.';
+        'Anda sedang mengisi formulir perpanjangan. Sertakan surat rekomendasi lama di dalam file ZIP.';
     }
 
-    // Update step fields: tambah nomor_surat_lama ke step 2
+    // Tambah nomor_surat_lama ke validasi step 2
     if (!STEP_FIELDS[2].includes('nomor_surat_lama')) {
       STEP_FIELDS[2].unshift('nomor_surat_lama');
     }
@@ -869,6 +907,7 @@
     if (cfg.API_URL) $('uploadForm').action = cfg.API_URL;
 
     tambahOPD();
+    updateTambahOPDBtn();
 
     // Cek apakah ini mode revisi
     const isRevisi = checkRevisiMode();

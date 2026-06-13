@@ -1881,7 +1881,6 @@ select.form-control:focus {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: var(--bg-card, #fff);
   border: 1.5px solid var(--border, #d5e0ee);
   border-radius: 12px;
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -1890,16 +1889,38 @@ select.form-control:focus {
   transition: all 0.2s ease;
   margin-bottom: 10px;
   text-align: left;
+  background: #f4f8ff;
+}
+.popup-pilihan-btn:first-of-type {
+  background: linear-gradient(135deg, #eef4ff, #deeaff);
+  border-color: #b0ccf5;
+}
+.popup-pilihan-btn:last-of-type {
+  background: linear-gradient(135deg, #fffbf0, #fef3dc);
+  border-color: #f0d090;
 }
 .popup-pilihan-btn:hover {
-  border-color: var(--primary, #2558a3);
-  background: #f0f6ff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37,88,163,0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37,88,163,0.15);
+}
+.popup-pilihan-btn:first-of-type:hover {
+  border-color: #2558a3;
+  background: linear-gradient(135deg, #e4efff, #d0e2ff);
+}
+.popup-pilihan-btn:last-of-type:hover {
+  border-color: #d4a017;
+  background: linear-gradient(135deg, #fff8e6, #fef0c0);
 }
 .popup-pilihan-icon {
-  font-size: 22px;
+  font-size: 24px;
   flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.7);
 }
 .popup-pilihan-text {
   flex: 1;
@@ -1922,4 +1943,22 @@ select.form-control:focus {
   color: var(--text-muted, #6c8194);
   font-size: 15px;
   flex-shrink: 0;
+}
+
+/* Perpanjangan view: sudah/belum pernah juga beda warna */
+#popupPerpanjanganView .popup-pilihan-btn:first-of-type {
+  background: linear-gradient(135deg, #e8faf2, #d4f5e4);
+  border-color: #8dd4b0;
+}
+#popupPerpanjanganView .popup-pilihan-btn:first-of-type:hover {
+  border-color: #1a9e5c;
+  background: linear-gradient(135deg, #d4f5e4, #b8edcf);
+}
+#popupPerpanjanganView .popup-pilihan-btn:last-of-type {
+  background: linear-gradient(135deg, #f5f0ff, #ede4ff);
+  border-color: #c4a8f0;
+}
+#popupPerpanjanganView .popup-pilihan-btn:last-of-type:hover {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #ede4ff, #ddd0ff);
 }
