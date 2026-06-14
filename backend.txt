@@ -26,30 +26,18 @@ function doPost(e) {
         var email = e.parameter.email;
         var nama = e.parameter.nama;
         var revisiRef       = (e.parameter.revisi_ref || "").trim();
-        // perpanjang_ref kini dari static hidden input + ref_lama sebagai fallback
-        var perpanjangRef   = (e.parameter.perpanjang_ref || e.parameter.ref_lama || "").trim();
-        var jenisPengajuan  = (e.parameter.jenis_pengajuan || "baru").trim();
+        var perpanjangRef   = (e.parameter.perpanjang_ref || "").trim();
 
         var refNum;
         var isRevisi       = false;
         var isPerpanjangan = false;
 
-        // Cek perpanjangan (static hidden input + jenis_pengajuan sebagai double-check)
-        if (perpanjangRef || jenisPengajuan === "perpanjangan") {
-          var refToCheck = perpanjangRef;
-          if (refToCheck) {
-            var checkPerpanjang = findRowByRefForPerpanjangan_(refToCheck);
-            if (checkPerpanjang > 0) {
-              isPerpanjangan = true;
-              refNum = refToCheck;
-            } else {
-              // Status mungkin sudah berubah (misalnya sudah pernah diperpanjang)
-              // Cari row berdasarkan ref_number saja
-              if (jenisPengajuan === "perpanjangan") {
-                isPerpanjangan = true;
-                refNum = refToCheck;
-              }
-            }
+        // Cek perpanjangan dulu (status Selesai → UPDATE row lama)
+        if (perpanjangRef) {
+          var checkPerpanjang = findRowByRefForPerpanjangan_(perpanjangRef);
+          if (checkPerpanjang > 0) {
+            isPerpanjangan = true;
+            refNum = perpanjangRef; // tetap pakai nomor ref lama
           }
         }
 
@@ -63,12 +51,11 @@ function doPost(e) {
         }
 
         if (!refNum) {
+          // Generate nomor referensi baru (pendaftaran baru)
           refNum = "KBP-" + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmm");
         }
 
-        Logger.log("doPost: jenis=" + jenisPengajuan + " perpanjangRef=" + perpanjangRef + " refNum=" + refNum + " isPerpanjangan=" + isPerpanjangan + " isRevisi=" + isRevisi);
-
-        var result = uploadFileToGoogleDrive(data, filename, nama, email, e, refNum, isPerpanjangan, isRevisi);
+        var result = uploadFileToGoogleDrive(data, filename, nama, email, e, refNum);
 
         // Kirim email konfirmasi
         kirimEmailKonfirmasi(e, refNum, isRevisi, isPerpanjangan);
@@ -133,29 +120,27 @@ function findRowByRefForPerpanjangan_(refNumber) {
   return -1;
 }
 
-function record_data(e, fileUrl, refNum, isPerpanjangan, isRevisi) {
+function record_data(e, fileUrl, refNum) {
     try {
         var doc = SpreadsheetApp.openById('1p5vDE8-dQbLxQbaxeE9nknDQ0W53QBqibE9qxmOa-0Q');
         var sheet = doc.getSheetByName('Data');
         var timestamp = new Date();
         var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-        // Flag sudah ditentukan di doPost — tidak perlu re-detect
-        // Cari targetRow berdasarkan refNum langsung
-        var targetRow = -1;
-        if (isPerpanjangan || isRevisi) {
-          var values = sheet.getDataRange().getValues();
-          var hdrs = values[0].map(function(h){ return h.toString().toLowerCase().trim(); });
-          var refCol = hdrs.indexOf('ref_number');
-          if (refCol >= 0) {
-            for (var r = 1; r < values.length; r++) {
-              var rowRef = values[r][refCol] ? values[r][refCol].toString().trim() : "";
-              if (rowRef === refNum) {
-                targetRow = r + 1; // 1-based
-                break;
-              }
-            }
-          }
+        // Cek apakah ini perpanjangan (prioritas: perpanjangan > revisi)
+        var perpanjangRef = (e.parameter.perpanjang_ref || "").trim();
+        var revisiRef     = (e.parameter.revisi_ref || "").trim();
+        var targetRow     = -1;
+        var isRevisi      = false;
+        var isPerpanjangan = false;
+
+        if (perpanjangRef) {
+          targetRow = findRowByRefForPerpanjangan_(perpanjangRef);
+          if (targetRow > 0) isPerpanjangan = true;
+        }
+        if (!isPerpanjangan && revisiRef) {
+          targetRow = findRowByRefForRevisi_(revisiRef);
+          if (targetRow > 0) isRevisi = true;
         }
 
         var row = [
@@ -165,27 +150,30 @@ function record_data(e, fileUrl, refNum, isPerpanjangan, isRevisi) {
         for (var i = 1; i < headers.length; i++) {
             var h = headers[i].toString().toLowerCase().trim();
             if (h == "file")               row.push(fileUrl);
-            else if (h == "status")        row.push("Pending");
+            else if (h == "status")        row.push("Pending"); // semua mode → balik ke Pending
             else if (h == "ref_number")    row.push(refNum || "");
             else if (h == "revisi_count") {
-              if (isRevisi && targetRow > 0) {
+              if (isRevisi) {
                 var currentVal = sheet.getRange(targetRow, i + 1).getValue();
-                row.push((parseInt(currentVal) || 0) + 1);
+                var count = parseInt(currentVal) || 0;
+                row.push(count + 1);
               } else {
-                row.push(0);
+                row.push(0); // perpanjangan reset revisi_count ke 0
               }
             }
             else if (h == "perpanjang_count") {
-              if (isPerpanjangan && targetRow > 0) {
+              if (isPerpanjangan) {
                 var currentPerpanjang = sheet.getRange(targetRow, i + 1).getValue();
-                row.push((parseInt(currentPerpanjang) || 0) + 1);
+                var countP = parseInt(currentPerpanjang) || 0;
+                row.push(countP + 1);
               } else {
                 row.push(0);
               }
             }
             else {
-              if (isPerpanjangan && targetRow > 0 && !e.parameter[headers[i]]) {
-                // Perpanjangan: pertahankan nilai lama kalau field tidak dikirim
+              // Untuk perpanjangan: update field yang dikirim, pertahankan yang tidak dikirim
+              if (isPerpanjangan && !e.parameter[headers[i]]) {
+                // Ambil nilai lama dari sheet
                 row.push(sheet.getRange(targetRow, i + 1).getValue() || "");
               } else {
                 row.push(e.parameter[headers[i]] || "");
@@ -194,21 +182,19 @@ function record_data(e, fileUrl, refNum, isPerpanjangan, isRevisi) {
         }
 
         if ((isRevisi || isPerpanjangan) && targetRow > 0) {
-          // UPDATE row lama
+          // UPDATE row yang sudah ada
           sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
-          Logger.log("UPDATED row " + targetRow + " for ref: " + refNum + " isPerpanjangan=" + isPerpanjangan + " isRevisi=" + isRevisi);
         } else {
-          // INSERT row baru
+          // APPEND row baru (pendaftaran baru)
           var nextRow = sheet.getLastRow() + 1;
           sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
-          Logger.log("INSERTED new row " + nextRow + " for ref: " + refNum);
         }
     } catch (error) {
-        Logger.log("record_data error: " + error);
+        Logger.log(error);
     }
 }
 
-function uploadFileToGoogleDrive(data, file, nama, email, e, refNum, isPerpanjangan, isRevisi) {
+function uploadFileToGoogleDrive(data, file, nama, email, e, refNum) {
     try {
         var folder = DriveApp.getFoldersByName("REGISTRASI").hasNext() ? DriveApp.getFoldersByName("REGISTRASI").next() : DriveApp.createFolder("REGISTRASI");
 
@@ -216,7 +202,7 @@ function uploadFileToGoogleDrive(data, file, nama, email, e, refNum, isPerpanjan
         var blob = Utilities.newBlob(bytes, data.substring(5, data.indexOf(';')), file);
         var file = folder.createFile(blob);
         
-        record_data(e, file.getUrl(), refNum, isPerpanjangan, isRevisi);
+        record_data(e, file.getUrl(), refNum);
         return file.getUrl();
     } catch (error) {
         return null;
