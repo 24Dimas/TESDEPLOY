@@ -726,33 +726,29 @@
   };
 
   window.mulaiFormPerpanjangan = function() {
+    if (modePerpanjangan === 'perpanjangan-sudah' && window._dataLamaPerpanjangan) {
+      // Redirect ke URL dengan ?perpanjang=ref — sama persis seperti alur revisi (?revisi=ref)
+      // Ini cara paling reliable: ref terbaca dari URL saat page load, bukan dari memori JS popup
+      const ref = window._dataLamaPerpanjangan.ref_number || '';
+      if (!ref) {
+        showCustomAlert('Nomor referensi tidak ditemukan. Silakan cari ulang.', 'Error', '⚠️');
+        return;
+      }
+      closeModal('popupModal');
+      window.location.href = window.location.pathname + '?perpanjang=' + encodeURIComponent(ref);
+      return;
+    }
+
+    // Mode perpanjangan-belum: user belum pernah daftar online → INSERT row baru (benar)
     $('jenis_pengajuan').value = 'perpanjangan';
     closeModal('popupModal');
 
-    // Tampilkan banner perpanjangan
     const banner = document.getElementById('perpanjanganBanner');
     banner.style.display = 'flex';
-
-    // Tampilkan field nomor surat lama
     document.getElementById('nomorSuratLamaBox').style.display = 'block';
+    document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
+      'Anda sedang mengisi formulir perpanjangan. Sertakan surat rekomendasi lama di dalam file ZIP.';
 
-    if (modePerpanjangan === 'perpanjangan-sudah' && window._dataLamaPerpanjangan) {
-      // Simpan ref lama sebagai perpanjang_ref (UPDATE row lama, bukan INSERT baru)
-      $('perpanjang_ref').value = window._dataLamaPerpanjangan.ref_number || '';
-
-      // Auto-fill data lama, kosongkan tanggal (user isi ulang)
-      fillFormFromData(window._dataLamaPerpanjangan, null);
-      $('tanggal_mulai').value = '';
-      $('tanggal_selesai').value = '';
-      document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
-        'Data lama sudah terisi otomatis. Perbarui tanggal penelitian baru dan upload berkas (termasuk surat rekomendasi lama).';
-    } else {
-      // Perpanjangan baru (belum pernah isi online) → INSERT row baru
-      document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
-        'Anda sedang mengisi formulir perpanjangan. Sertakan surat rekomendasi lama di dalam file ZIP.';
-    }
-
-    // Tambah nomor_surat_lama ke validasi step 2
     if (!STEP_FIELDS[2].includes('nomor_surat_lama')) {
       STEP_FIELDS[2].unshift('nomor_surat_lama');
     }
@@ -791,6 +787,64 @@
       .catch(err => {
         hideRevisiLoading();
         showCustomAlert('Gagal memuat data revisi. Periksa koneksi internet.', 'Gagal', '❌');
+      });
+    return true;
+  }
+
+  // ========== PERPANJANGAN MODE — auto-fill dari URL ?perpanjang=KBP-xxx ==========
+  function checkPerpanjanganMode() {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('perpanjang');
+    if (!ref || !/^KBP-\d+-\d+$/i.test(ref)) return false;
+
+    showRevisiLoading();
+
+    const cfg = window.SIREINO_CONFIG || {};
+    if (!cfg.API_URL) return false;
+
+    fetch(`${cfg.API_URL}?action=getDataByRefPerpanjangan&ref=${encodeURIComponent(ref.toUpperCase())}`)
+      .then(r => r.json())
+      .then(json => {
+        if (!json.found) {
+          hideRevisiLoading();
+          showCustomAlert(
+            json.error || 'Data tidak ditemukan atau status belum Selesai.',
+            'Perpanjangan Tidak Tersedia', '⚠️'
+          );
+          return;
+        }
+
+        // Ini kuncinya: set perpanjang_ref dari URL (bukan dari memori popup)
+        $('perpanjang_ref').value = ref.toUpperCase();
+        $('jenis_pengajuan').value = 'perpanjangan';
+
+        // Auto-fill data lama, kosongkan tanggal (user isi tanggal baru)
+        fillFormFromData(json.data, null);
+        $('tanggal_mulai').value = '';
+        $('tanggal_selesai').value = '';
+
+        // Tampilkan banner perpanjangan
+        const banner = document.getElementById('perpanjanganBanner');
+        banner.style.display = 'flex';
+        document.getElementById('nomorSuratLamaBox').style.display = 'block';
+        document.getElementById('perpanjanganBanner').querySelector('#perpanjanganBannerMsg').textContent =
+          'Data lama sudah terisi otomatis. Perbarui tanggal penelitian baru dan upload berkas (termasuk surat rekomendasi lama).';
+
+        // Ganti teks tombol submit
+        const sBtn = $('btnSubmit');
+        if (sBtn) sBtn.innerHTML = '<i class="bi bi-send-fill"></i> Kirim Perpanjangan';
+
+        // Tambah nomor_surat_lama ke validasi step 2
+        if (!STEP_FIELDS[2].includes('nomor_surat_lama')) {
+          STEP_FIELDS[2].unshift('nomor_surat_lama');
+        }
+
+        hideRevisiLoading();
+        showStep(1);
+      })
+      .catch(() => {
+        hideRevisiLoading();
+        showCustomAlert('Gagal memuat data perpanjangan. Periksa koneksi internet.', 'Gagal', '❌');
       });
     return true;
   }
@@ -897,11 +951,12 @@
     tambahOPD();
     updateTambahOPDBtn();
 
-    // Cek apakah ini mode revisi
+    // Cek apakah ini mode revisi atau perpanjangan (via URL parameter)
     const isRevisi = checkRevisiMode();
+    const isPerpanjangan = !isRevisi && checkPerpanjanganMode();
 
-    // Welcome popup hanya kalau BUKAN revisi
-    if (!isRevisi) {
+    // Welcome popup hanya kalau BUKAN revisi dan BUKAN perpanjangan
+    if (!isRevisi && !isPerpanjangan) {
       // Reset popup ke view awal (tipe pilihan)
       document.getElementById('popupTipeView').style.display = 'block';
       document.getElementById('popupPerpanjanganView').style.display = 'none';
