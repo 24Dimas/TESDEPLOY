@@ -485,6 +485,8 @@
   window.doReset = function () {
     closeModal('customConfirmReset');
     $('uploadForm').reset();
+    $('perpanjang_ref').value = '';
+    $('revisi_ref').value = '';
     $('opd-list').innerHTML = ''; tambahOPD();
     $('opd-wrapper').classList.remove('error','has-error');
     $('anggota-list').innerHTML = '';
@@ -715,6 +717,8 @@
   window.mulaiFormBaru = function() {
     modePerpanjangan = null;
     $('jenis_pengajuan').value = 'baru';
+    $('perpanjang_ref').value = '';
+    $('revisi_ref').value = '';
     closeModal('popupInfoBaru');
     // Reset field perpanjangan
     document.getElementById('nomorSuratLamaBox').style.display = 'none';
@@ -734,14 +738,7 @@
 
     if (modePerpanjangan === 'perpanjangan-sudah' && window._dataLamaPerpanjangan) {
       // Simpan ref lama sebagai perpanjang_ref (UPDATE row lama, bukan INSERT baru)
-      let hiddenPerpanjang = document.querySelector('input[name="perpanjang_ref"]');
-      if (!hiddenPerpanjang) {
-        hiddenPerpanjang = document.createElement('input');
-        hiddenPerpanjang.type = 'hidden';
-        hiddenPerpanjang.name = 'perpanjang_ref';
-        $('uploadForm').appendChild(hiddenPerpanjang);
-      }
-      hiddenPerpanjang.value = window._dataLamaPerpanjangan.ref_number || '';
+      $('perpanjang_ref').value = window._dataLamaPerpanjangan.ref_number || '';
 
       // Auto-fill data lama, kosongkan tanggal (user isi ulang)
       fillFormFromData(window._dataLamaPerpanjangan, null);
@@ -762,8 +759,6 @@
 
     showStep(1);
   };
-
-  window.closeWelcomePopup = function() { mulaiFormBaru(); };
 
   // ========== REVISI MODE — auto-fill dari ref number ==========
   function checkRevisiMode() {
@@ -802,14 +797,7 @@
 
   function fillFormFromData(d, ref) {
     // Simpan ref sebagai hidden input
-    let hidden = document.querySelector('input[name="revisi_ref"]');
-    if (!hidden) {
-      hidden = document.createElement('input');
-      hidden.type = 'hidden';
-      hidden.name = 'revisi_ref';
-      $('uploadForm').appendChild(hidden);
-    }
-    hidden.value = ref;
+    $('revisi_ref').value = ref || '';
 
     // Fill simple fields
     const simpleFields = ['atasnama','fakultas','nama_lembaga','nomor_surat','tgl_surat','perihal',
